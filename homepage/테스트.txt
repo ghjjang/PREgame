@@ -58,3 +58,23 @@ const defaultBackground = getComputedStyle(section1).backgroundColor;
         section1.style.backgroundColor = currentBackgroundColor;
     });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+✅ <script type="module"> 누락
+✅ script 태그 위치가 위
+✅ import 경로 오류
+✅ audio class 미지정
+✅ HTML 파일 위치와 경로 불일치

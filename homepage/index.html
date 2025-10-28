@@ -9,74 +9,112 @@
 </head>
 <body>
 <div class="header">
-    <h1 class="HOME" id="logo">LEEGH</h1>
-    <div class="nav">
-      <ul>
-        <li class="HOME" id="HOME">HOME</li>
-        <!-- 메인 페이지가 켜져있지 않으면 배경색을 감지하고 변경하는것이 실행되지 않아 임시조치로 새탭에서 열기를 활용 -->
-        <li><a href="계산기/calcuLator.html" target="_blank">CALCULATOR</a></li> 
-        <li class="dropdown">
-          <a href="#">BLANK</a>
-          <ul class="dropdown-menu">
-            <li><a href="#">BLANK</a></li>
-            <li><a href="#">BLANK</a></li>
-            <li><a href="#">BLANK</a></li>
-          </ul>
-        </li>
-        <li><a href="캘린더/date__cal.html" target="_blank">DATE</a></li>
-        <li><a href="#">BLANK</a></li>
-      </ul>
+  <h1 class="HOME" id="logo">LEEGH</h1>
+  <div class="nav">
+    <ul>
+      <li class="HOME" id="HOME">HOME</li>
+      <!-- 메인 페이지가 켜져있지 않으면 배경색을 감지하고 변경하는것이 실행되지 않아 임시조치로 새탭에서 열기를 활용 -->
+      <li><a href="계산기/calcuLator.html" target="_blank">CALCULATOR</a></li> 
+      <li class="dropdown">
+        <a href="#">BLANK</a>
+        <ul class="dropdown-menu">
+          <li><a href="#">BLANK</a></li>
+          <li><a href="#">BLANK</a></li>
+          <li><a href="#">BLANK</a></li>
+        </ul>
+      </li>
+      <li><a href="캘린더/date__cal.html" target="_blank">DATE</a></li>
+      <li><a href="#">BLANK</a></li>
+    </ul>
+  </div>
+</div>
+<div class ="upsection">
+  <h1></h1>
+</div>
+<div id="toast-container"></div>
+<!-- 3개 섹션 -->
+<div class="section" id="section1">
+  <div class="slider-container">
+    <div class="slider">
+      <div class="slide active"> 
+        <div class="hero">
+          
+          <h2>
+            <span>L</span>
+            <span>H</span>
+            <span>H</span>
+          </h2>
+          <p>D-<span id="days-since-birth"></span></p>
+          <button><a href="https://github.com/ghjjang/web" target="_blank">My GitHub</a></button>
+        </div>
+      </div>
+      <div class="slide">
+        <div class="music-player-modern">
+          <div class="album-art">
+            <img />
+          </div>
+
+          <div class="track-info">
+            <span class="track-title"></span>
+            <span class="track-artist"></span>
+          </div>
+
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+
+          <div class="controls">
+            <button onclick="prevTrack()">⏮</button>
+            <button onclick="audioPlay()">▶</button>
+            <button onclick="audioPause()">⏸</button>
+            <button onclick="nextTrack()">⏭</button>
+          </div>
+
+          <audio class="audio"></audio>
+        </div>
+      </div>
+      <div class="slide">
+        
+      </div>
     </div>
-  </div>
-  <div class ="upsection">
-    <h1></h1>
-  </div>
-
-  <!-- 3개 섹션 -->
-  <div class="section" id="section1">
-    <div class="hero">
-      <h2>
-        <span>L</span>
-        <span>H</span>
-        <span>H</span>
-      </h2>
-      <p>D-<span id="days-since-birth"></span></p>
-      <button><a href="https://github.com/ghjjang/web" target="_blank">My GitHub</a></button>
-    </div>
-  </div>
-
-  <div class="section" id="section2">
-    <div>Section 2</div>
-    
-  </div>
-
-  <div class="section" id="section3">
-    <div>Section 3</div>
-  </div>
-
-  <div class="section" id="section4">
-    <div>Section 4</div>
-  </div>
-
-  <div class="section" id="section5">
-    <div>Section 5</div>
-  </div>
-
-  <audio id="bgm" src="music/unplugged boy.mp3" controls loop></audio>
-    
-
-
- 
   
-  <div alt="scroll to top" onclick="scrollToTop()" style="cursor: pointer;" class="scroll-button">TOP</div>
+    <button class="slide-btn prev"></button>
+    <button class="slide-btn next"></button>
+  </div>
+</div>
+
+<div class="section" id="section2">
+  <div>Section 2</div>
+  
+</div>
+
+<div class="section" id="section3">
+  <div>Section 3</div>
+</div>
+
+<div class="section" id="section4">
+  <div>Section 4</div>
+</div>
+
+<div class="section" id="section5">
+  <div>Section 5</div>
+</div>
+
+
  
 
   <footer>
     <p>  <span id="time-until-discharge"></span></p>
     
   </footer>
-    <script src="main.js"></script>
-    <script src="homepage/계산기/utils.js"></script>
+
+  <!-- JS Modules -->
+  <script src="../calculator/utils.js"></script>    
+  <script type="module" src="../homejs/main.js"></script>
+  <script type="module" src="./homejs/musicData.js"></script>   
+  <script type="module" src="./homejs/music.js"></script>
+  <script type="module" src="./homejs/dateTime.js"></script>
 </body>
 </html>
-  
+
+

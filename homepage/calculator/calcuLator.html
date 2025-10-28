@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>계산기</title>
+    <link rel="stylesheet" href="../style.css"> <!-- 공통 스타일 -->
+    <link rel="stylesheet" href="calcuLatorStyle.css"> <!-- 계산기 전용 스타일 -->
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 추가 -->
+        <div class="header">
+            <h1 id="logo">LEEGH</h1>
+        </div>
+    </div>
+    <div class="outer">
+        <div class="carculator">
+        <input type="text" id="display"><br>
+        <input type="text" id="result"><br>
+
+        <div class="line" id="first">
+            <div id="btn_reset" onclick='reset()'><img src="./img/icon_reset.svg"></div> <!--클릭시 function reset() 연결-->
+            <div class="expression" onclick='add(" / ")'><img src="./img/icon_division.svg"></div>
+        </div>
+
+        <div class="line">
+            <div onclick='add(7)'><img src="./img/icon_7.svg"></div>
+            <div onclick='add(8)'><img src="./img/icon_8.svg"></div>
+            <div onclick='add(9)'><img src="./img/icon_9.svg"></div>
+            <div class="expression" onclick='add(" * ")'><img src="./img/icon_multiply.svg"></div>
+        </div>
+
+        <div class="line">
+            <div onclick='add(4)'><img src="./img/icon_4.svg"></div>
+            <div onclick='add(5)'><img src="./img/icon_5.svg"></div>
+            <div onclick='add(6)'><img src="./img/icon_6.svg"></div>
+            <div class="expression" onclick='add(" - ")'><img src="./img/icon_minus.svg"></div>
+        </div>
+
+        <div class="line">
+            <div onclick='add(1)'><img src="./img/icon_1.svg"></div>
+            <div onclick='add(2)'><img src="./img/icon_2.svg"></div>
+            <div onclick='add(3)'><img src="./img/icon_3.svg"></div>
+            <div class="expression" onclick='add(" + ")'><img src="./img/icon_plus.svg"></div>
+        </div>
+
+        <div class="line" id="last">
+            <div id="btn_zero" onclick='add(0)'><img src="./img/icon_0.svg"></div>
+            <div onclick='add(".")'><img src="./img/icon_comma.svg"></div>
+            <div id="btn_equl" class="expression" onclick='caculate()'><img src="./img/icon_equl.svg"></div> <!--클릭시 function caculate() 연결-->
+        </div>
+
+        </div>
+
+    </div>
+    <div class="overlay" id="bottomSheet">
+        <button class="toggle-btn" onclick="toggleSheet()">___</button>
+        <div class="contentt">
+            <p>History</p>
+            <!-- 히스토리 항목이 여기에 추가됩니다 -->
+        </div>
+    </div>
+
+    <script src="calcuLatorMain.js"></script>
+    <script src="utils.js"></script>
+    
+</body>
+</html>
