@@ -1,7 +1,26 @@
 {
-  "name": "my-webpage",
+  "name": "openworld-rpg-phaser3",
   "version": "1.0.0",
+  "description": "2D Top-down OpenWorld RPG Game built with Phaser 3",
+  "type": "module",
   "scripts": {
-    "start": "npx serve ."
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "phaser3",
+    "rpg",
+    "game",
+    "2d"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "eslint": "^9.39.1"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
   }
 }
