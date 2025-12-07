@@ -7,14 +7,16 @@ import Phaser from 'phaser';
 
 export default class Player extends Phaser.Physics.Arcade.Sprite {
     constructor(scene, x, y) {
-        super(scene, x, y, 'player');
+        super(scene, x, y, 'player-idle');
         
         // Scene에 추가
         scene.add.existing(this);
         scene.physics.add.existing(this);
 
         // 스케일 설정 - 픽셀 퍼펙트를 위해 정수 배율 권장
-        this.setScale(6);
+        // original sprites were 16x16 scaled x6; new sheets are 48x48 scaled x2 to preserve size
+        this.setScale(2);
+        this.setOrigin(0.5, 0.5);
 
         // Physics 설정
         this.setCollideWorldBounds(false);
@@ -31,6 +33,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
             xp: 0,
             maxXp: 100,
             attack: 10, 
+            attackSpeed: 1.2, // 초당 공격 횟수
             defense: 5,
             speed: 200,
             dashSpeed: 400
@@ -42,6 +45,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         this.invincible = false;
         
         this.dashCooldown = 0;
+        this.attackCooldown = 0;
         this.dashDuration = 0;
         this.invincibleTimer = 0;
 
@@ -55,6 +59,16 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         // 입력 설정
         this.setupInput(scene);
+
+        // 애니메이션 전환 시 앵커 보정 (공격/대시 등 여백 많은 시트 대비)
+        this._setupAnimationAnchors();
+
+        // 방향별 앵커 보정 강도 (필요 시 조정)
+        this._anchorConfig = {
+            default: { ox: 0.5, oy: 0.5 },
+            padded: { dx: 0.02, oy: 0.6 }, // dash에만 적용
+            dash: { forward: 12 } // 대시 시 실제 위치 전진(애니메이션 시작 시)
+        };
     }
 
     setupInput(scene) {
@@ -84,7 +98,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         // 마우스 클릭 (공격)
         scene.input.on('pointerdown', (pointer) => {
-            if (!this.isAttacking && !this.inventoryOpen && !this.settingsOpen) {
+            if (!this.isAttacking && this.attackCooldown <= 0 && !this.inventoryOpen && !this.settingsOpen) {
                 this.attack(pointer);
             }
         });
@@ -95,13 +109,10 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         // 쿨다운 타이머 업데이트
         if (this.dashCooldown > 0) this.dashCooldown -= dt;
-        if (this.dashDuration > 0) this.dashDuration -= dt;
+        if (this.attackCooldown > 0) this.attackCooldown -= dt;
+        
+        // dashDuration logic removed as it is handled by delayedCall in dash()
         if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
-
-        // 대시 종료
-        if (this.isDashing && this.dashDuration <= 0) {
-            this.isDashing = false;
-        }
 
         // 무적 종료
         if (this.invincible && this.invincibleTimer <= 0) {
@@ -114,6 +125,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
             this.setAlpha((Math.sin(time * 0.02) + 1) / 2);
         }
 
+        // 공격 입력 처리 (마우스 홀드 지원)
+        if (this.scene.input.activePointer.isDown) {
+             if (!this.isAttacking && this.attackCooldown <= 0 && !this.inventoryOpen && !this.settingsOpen) {
+                this.attack(this.scene.input.activePointer);
+            }
+        }
+
         // 이동 처리
         this.handleMovement();
     }
@@ -122,11 +140,14 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         // 인벤토리나 설정이 열려있으면 이동 불가
         if (this.inventoryOpen || this.settingsOpen) {
             this.setVelocity(0, 0);
-            this.anims.play(`idle-${this.lastDirection}`, true);
+            this.anims.play(`idle`, true);
             return;
         }
+
+        // 대시 중이면 이동 입력 무시 (대시 속도 유지)
+        if (this.isDashing) return;
         
-        const speed = this.isDashing ? this.stats.dashSpeed : this.stats.speed;
+        const speed = this.stats.speed;
         let velocityX = 0;
         let velocityY = 0;
         let moving = false;
@@ -146,11 +167,19 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
             velocityX = -speed;
             this.direction = 'left';
             moving = true;
+            if (!this.flipX) {
+                this.setFlipX(true);
+                this._updateAnchorForCurrentAnim();
+            }
         }
         if (this.keys.D.isDown) {
             velocityX = speed;
             this.direction = 'right';
             moving = true;
+            if (this.flipX) {
+                this.setFlipX(false);
+                this._updateAnchorForCurrentAnim();
+            }
         }
 
         // 대각선 이동 속도 보정
@@ -168,42 +197,96 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         this.setVelocity(velocityX, velocityY);
 
         // 애니메이션
-        if (moving && !this.isAttacking) {
-            this.anims.play(`walk-${this.direction}`, true);
+        if (this.isDashing) {
+            // 대시 중에는 대시 애니메이션 유지 (dash()에서 재생됨)
+        } else if (moving && !this.isAttacking) {
+            this.anims.play(`walk`, true);
             this.lastDirection = this.direction;
         } else if (!this.isAttacking) {
-            this.anims.play(`idle-${this.lastDirection}`, true);
+            this.anims.play(`idle`, true);
         }
     }
 
     dash() {
-        this.isDashing = true;
-        this.dashDuration = 0.3; // 300ms
-        this.dashCooldown = 2; // 2초
-        this.stats.sp -= 20;
-
-        // 대시 잔상 이펙트 (플레이어 따라다니지 않음)
-        const startX = this.x;
-        const startY = this.y;
-        const dashEffect = this.scene.add.sprite(startX, startY, 'player', this.anims.currentFrame?.index || 0)
-            .setScale(6)
-            .setAlpha(0.5)
-            .setTint(0x00ddff);
+        if (this.isDashing) return;
         
-        // 페이드아웃 애니메이션
-        this.scene.tweens.add({
-            targets: dashEffect,
-            alpha: 0,
-            duration: 200,
-            onComplete: () => dashEffect.destroy()
-        });
-
-        // 이벤트 발생
+        // 자원 소모 및 쿨다운
+        this.dashCooldown = 2; 
+        this.stats.sp -= 20;
         this.scene.events.emit('playerDash', this);
+
+        this.isDashing = true;
+
+        const dashDistance = 300;   // 전진 거리
+        const dashDuration = 300;   // 대시 지속 시간(ms)
+        
+        // 방향에 따라 전진 오프셋 계산
+        let dx = 0, dy = 0;
+        if (this.direction === 'right')  dx = dashDistance;
+        else if (this.direction === 'left')   dx = -dashDistance;
+        else if (this.direction === 'up')     dy = -dashDistance;
+        else if (this.direction === 'down')   dy = dashDistance;
+        else dy = dashDistance; // 기본값
+
+        try { this.anims.play('dash', true); } catch (e) {}
+
+        // 대시 애니메이션과 함께 실제 위치 이동 (트윈 사용)
+        this.scene.tweens.add({
+            targets: this,
+            x: this.x + dx,
+            y: this.y + dy,
+            duration: dashDuration,
+            ease: 'Power2',
+            onComplete: () => {
+                this.isDashing = false;
+                try { this.anims.play('idle', true); } catch (e) {}
+            }
+        });
     }
 
     attack(pointer) {
         this.isAttacking = true;
+        
+        // 공격 속도에 따른 쿨다운 설정 (초 단위)
+        this.attackCooldown = 1 / this.stats.attackSpeed;
+
+        try { 
+            this.anims.play('attack', true); 
+            const currentAnim = this.anims.currentAnim;
+            
+            // 애니메이션 속도 조절 (공격 속도에 맞춤, 기본 1배)
+            // 만약 공격 속도가 매우 빠르면 애니메이션도 빨라져야 함
+            // 기본 애니메이션 지속시간이 쿨다운보다 길면 애니메이션 속도를 높임
+            
+            if (currentAnim) {
+                // 현재 애니메이션의 총 프레임 수와 프레임 레이트 가져오기
+                const totalFrames = currentAnim.frames.length;
+                const defaultFrameRate = currentAnim.frameRate || 12;
+                const defaultDuration = totalFrames / defaultFrameRate; // 초 단위
+
+                // 공격 속도에 비례하여 애니메이션 속도 증가
+                // 기본적으로 attackSpeed 배율을 따르되, 
+                // 애니메이션 길이가 쿨다운보다 길어지는 경우(매우 긴 애니메이션)에는 쿨다운에 맞춰 더 빠르게 재생
+                
+                // 최소 요구 속도 (쿨다운 내에 재생 완료)
+                const minTimeScale = defaultDuration / this.attackCooldown;
+                
+                // 공격 속도에 비례한 속도 (기본 1.0 * attackSpeed)
+                const proportionalTimeScale = this.stats.attackSpeed;
+
+                this.anims.timeScale = Math.max(proportionalTimeScale, minTimeScale);
+            }
+
+        } catch (e) {
+            console.warn('Attack animation failed:', e);
+        }
+
+        // 공격 효과음 재생
+        try {
+            this.scene.sound.play('attackSound', { volume: 0.5 });
+        } catch (e) {
+            console.warn('Failed to play attack sound:', e);
+        }
 
         // 캐릭터가 바라보는 방향으로 공격 (lastDirection 사용)
         let angle;
@@ -227,34 +310,6 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         // 현재 위치 저장
         const startX = this.x;
         const startY = this.y;
-
-        // 공격 모션 - 공격 방향으로 빠르게 돌진
-        const moveDistance = 40;
-        const targetX = this.x + Math.cos(angle) * moveDistance;
-        const targetY = this.y + Math.sin(angle) * moveDistance;
-        
-        // 돌진 모션
-        this.scene.tweens.add({
-            targets: this,
-            x: targetX,
-            y: targetY,
-            
-            duration: 80,
-            ease: 'Quad.easeOut',
-            onComplete: () => {
-                // 복귀 모션
-                this.scene.tweens.add({
-                    targets: this,
-                    x: startX,
-                    y: startY,
-                    scaleX: 6,
-                    scaleY: 6,
-                    duration: 120,
-                    ease: 'Quad.easeIn'
-                });
-            }
-        });
-
       
         
         // 공격 판정
@@ -264,12 +319,22 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
             range: 100,
             damage: this.stats.attack,
             angle: angle
-
         });
 
         // 공격 애니메이션 종료
-        this.scene.time.delayedCall(200, () => {
+        this.once('animationcomplete-attack', () => {
             this.isAttacking = false;
+            // 애니메이션 timeScale 초기화
+            this.anims.timeScale = 1;
+        });
+
+        // Fallback: 애니메이션 이벤트가 발생하지 않을 경우를 대비한 안전장치
+        // 쿨다운 + 0.1초로 넉넉하게 설정
+        this.scene.time.delayedCall(this.attackCooldown * 1000 + 100, () => {
+            if (this.isAttacking) {
+                this.isAttacking = false;
+                this.anims.timeScale = 1;
+            }
         });
     }
 
@@ -285,6 +350,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         // 피격 이펙트
         this.scene.cameras.main.shake(100, 0.01);
+        try { this.anims.play('hit', true); } catch (e) {}
 
         // 사망 체크
         if (this.stats.hp <= 0) {
@@ -301,6 +367,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         this.stats.hp = 0;
         this.scene.events.emit('playerDied');
         
+        try { this.anims.play('death', true); } catch (e) {}
         // 스폰 지점으로 리스폰
         this.scene.time.delayedCall(2000, () => {
             this.respawn();
@@ -373,5 +440,53 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         this.inventoryOpen = !this.inventoryOpen;
         this.scene.events.emit('inventoryToggled', this.inventoryOpen);
         console.log('인벤토리:', this.inventoryOpen ? '열림' : '닫힘');
+    }
+
+    _setupAnimationAnchors() {
+        // 애니메이션 시작/종료 시 원점 및 위치 보정
+        const self = this;
+        this.on('animationstart', (anim) => {
+            const key = anim.key;
+            self._applyAnchorForAnim(key);
+            
+            // 공격: 스프라이트 표시만 앞으로 이동 (world 위치는 유지, 시각적 오프셋만)
+            
+            // 대시: 위치 오프셋 제거 (애니메이션만 재생)
+        });
+
+        this.on('animationcomplete', (anim) => {
+            const key = anim.key;
+            if (key === 'attack' || key === 'dash') {
+                // 기본 원점 복귀
+                self.setOrigin(0.5, 0.5);
+            }
+            
+            // 공격 종료: 스프라이트 위치 원복
+            
+            // 대시 종료: 시작 offset 복귀(트윈이 위치 제어하므로 추가 처리 불필요)
+            if (key === 'dash' && self._dashStartOffset) {
+                self._dashStartOffset = null;
+            }
+        });
+    }
+
+    _applyAnchorForAnim(key) {
+        const isPadded = (key === 'dash');
+        if (!isPadded) {
+            this.setOrigin(this._anchorConfig.default.ox, this._anchorConfig.default.oy);
+            return;
+        }
+        const dx = this._anchorConfig.padded.dx || 0;
+        const oy = this._anchorConfig.padded.oy || 0.6;
+        const ox = 0.5 + (this.flipX ? +dx : -dx);
+        this.setOrigin(ox, oy);
+        // 수평 위치 보정 제거: 공격은 forward offset으로 처리
+    }
+
+    _updateAnchorForCurrentAnim() {
+        const current = this.anims && this.anims.currentAnim ? this.anims.currentAnim.key : null;
+        if (current) {
+            this._applyAnchorForAnim(current);
+        }
     }
 }

@@ -6,9 +6,7 @@
 import Phaser from 'phaser';
 import BootScene from './scenes/BootScene.js';
 import GameScene from './scenes/GameScene.js';
-import TrainingScene from './scenes/TrainingScene.js';
 import UIScene from './scenes/UIScene.js';
-import ModeManager from './state/ModeManager.js';
 
 // URL 파라미터로 스케일 모드 선택: ?scale=fit|envelop|resize
 function getScaleMode() {
@@ -51,14 +49,12 @@ const config = {
         antialias: false,
         mipmapFilter: 'NEAREST'
     },
-    scene: [BootScene, GameScene, TrainingScene, UIScene]
+    scene: [BootScene, GameScene, UIScene]
 };
 
 const game = new Phaser.Game(config);
 
-// Initialize ModeManager from URL and enable history sync
-ModeManager.initFromUrl('normal');
-ModeManager.enableUrlSync({ pushHistory: true });
+// Training mode removed: no in-memory mode manager needed
 
 // Start BootScene to handle asset loading and further startup
 game.scene.start('BootScene');

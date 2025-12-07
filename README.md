@@ -13,46 +13,18 @@
 ├── src/
 │   ├── main.js            # Phaser 게임 진입점
 │   ├── scenes/            # Phaser Scene
-│   │   ├── BootScene.js   # 에셋 로딩
-│   │   ├── GameScene.js   # 메인 게임플레이
-│   │   └── UIScene.js     # UI 오버레이
-│   ├── entities/          # 게임 엔티티
-│   │   └── Player.js      # 플레이어 클래스
 │   └── systems/           # 게임 시스템
 │
 ├── public/
 │   └── assets/
-│       └── images/        # 게임 이미지 에셋
-│
-└── legacy/                # 기존 Vanilla JS 코드 (참고용)
 ```
 
 ## 🚀 실행 방법
-
-### 개발 모드
-```bash
 npm run dev
 ```
 브라우저가 자동으로 http://localhost:8000 열림
 
-### 빌드
-```bash
-npm run build
-```
-`dist/` 폴더에 프로덕션 빌드 생성
-
-## 🎯 주요 기능
-
-### Phaser 3 엔진 기능
-- ✅ **Physics Engine**: Arcade Physics로 자동 충돌 처리
-- ✅ **애니메이션 시스템**: 플레이어 4방향 걷기/정지 애니메이션
-- ✅ **Scene 관리**: Boot → Game → UI 계층 구조
-- ✅ **카메라 시스템**: 부드러운 플레이어 추적
-- ✅ **이벤트 시스템**: Scene 간 통신
-
-### 게임 시스템
-- ✅ **플레이어**: 
-  - 8방향 이동 (WASD)
+<!-- ModeManager and training mode removed -->
   - 대시 스킬 (Shift) - 스태미나 소모, 쿨다운
   - 공격 시스템 (마우스 클릭) - 범위 공격
   - 레벨/경험치/스탯 시스템
@@ -109,18 +81,12 @@ npm run build
 - [ ] 세이브/로드 시스템
 - [ ] 멀티플레이어 (Socket.io)
 
-## ModeManager 및 모드 전환
+## 모드 전환 (현재)
 
-게임 모드는 이제 `ModeManager` 싱글톤으로 메모리 내에서 관리됩니다. 이는 URL 기반 리다이렉트 대신, 앱 내에서 즉시 씬 전환 및 UI 반영을 가능하게 합니다.
+이 저장소는 단일 GameScene 기반 SPA로 동작하도록 통합되었습니다.
+훈련 모드(`training`)는 더 이상 지원되지 않으며, 앱은 `BootScene`에서 `GameScene`을 시작합니다.
 
-주요 기능:
-- URL 기반 초기화와 브라우저 주소창 동기화(pushState)
-- `ModeManager.on('modeChanged')` 이벤트로 씬/시스템 간 모드 전파
-- `ModeManager.enableUrlSync({pushHistory: true})`로 주소 바 동기화 켜기
-
-팁: 훈련/일반 모드 전환 버튼을 클릭할 때 Shift 키를 함께 누르면 "초기화 옵션"(resetPlayerState)을 활성화하여 플레이어 상태를 초기화한 뒤 훈련 모드로 들어가고, 돌아올 때 원래 상태로 복원합니다.
-
-자세한 사용법은 `docs/MODE_MANAGER.md`를 참고하세요.
+참고: `src/state/ModeManager.js`는 하위 호환성을 위해 최소한의 API를 유지하지만, 훈련 모드 관련 로직 및 스냅샷 기능은 제거되었습니다.
 
 ## 📄 라이선스
 

@@ -4,7 +4,6 @@
  */
 
 import Phaser from 'phaser';
-import ModeManager from '../state/ModeManager.js';
 
 export default class BootScene extends Phaser.Scene {
     constructor() {
@@ -54,10 +53,19 @@ export default class BootScene extends Phaser.Scene {
 
     loadAssets() {
         // 플레이어 스프라이트 (16x16, 4행 4열)
-        this.load.spritesheet('player', '/assets/images/player.png', {
-            frameWidth: 16,
-            frameHeight: 16
-        });
+
+        // New (48x48 base) character sheets (filenames start with numbers)
+        // Notice the filenames contain spaces/periods — they are valid paths.
+        // Vertical stacked sheets (actual dimensions: idle 112x336, run 112x448)
+        // FrameHeight = 56 (336/6, 448/12), FrameWidth = 112 for both
+        this.load.spritesheet('player-idle', 'assets/images/1. idle 264 x 56.png', { frameWidth: 112, frameHeight: 56 });
+        this.load.spritesheet('player-run', 'assets/images/2. Run 408 x 56.png', { frameWidth: 112, frameHeight: 56 });
+        
+        
+        this.load.spritesheet('player-attack', '/assets/images/5. Attack 131 x 56.png', { frameWidth: 112, frameHeight: 56 });
+        this.load.spritesheet('player-dash', '/assets/images/6. Dash 112 x 56 .png', { frameWidth: 112, frameHeight: 56 });
+        
+        
 
         // 대시 이펙트
         this.load.image('dash', '/assets/images/dash.png');
@@ -72,73 +80,54 @@ export default class BootScene extends Phaser.Scene {
     create() {
         // 플레이어 애니메이션 생성
         this.createAnimations();
-        // Ensure ModeManager is initialized. Prefer in-memory ModeManager value,
-        // but fall back to URL param if not set. This allows BootScene to be used
-        // even if main.js didn't call ModeManager.initFromUrl().
-        ModeManager.initFromUrl('normal');
-        const mode = ModeManager.getMode();
-        const target = mode === 'training' ? 'TrainingScene' : 'GameScene';
+        // BootScene now always starts the main GameScene (training mode removed)
+        const target = 'GameScene';
 
         this.scene.start(target);
         this.scene.launch('UIScene');
     }
 
     createAnimations() {
-        // 아래 방향 (row 0)
-        this.anims.create({
-            key: 'walk-down',
-            frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
-            frameRate: 8,
-            repeat: -1
+        // 재정의를 위해 기존 키 제거 (개발 중 핫리로드 대비)
+        ['idle','walk','attack','dash','hit','death'].forEach(k => {
+            if (this.anims.exists(k)) this.anims.remove(k);
         });
+        // Setup simple, direction-agnostic animations using the new 48x48 spritesheets
+        const createAnimationFromSheet = (key, animKey, config = {}) => {
+            try {
+                if (!this.textures.exists(key)) return;
+                const total = this.textures.get(key).frameTotal || 1;
+                const end = Math.max(0, total - 1);
+                const frames = this.anims.generateFrameNumbers(key, { start: 0, end: end });
+                this.anims.create(Object.assign({ key: animKey, frames, frameRate: 8, repeat: -1 }, config));
+            } catch (e) {
+                console.warn('[BootScene] Failed to create animation from', key, e);
+            }
+        };
 
-        // 위 방향 (row 1)
-        this.anims.create({
-            key: 'walk-up',
-            frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
-            frameRate: 8,
-            repeat: -1
-        });
+        // 조금 더 자연스러운 속도
+        createAnimationFromSheet('player-idle', 'idle', { frameRate: 6 });
+        createAnimationFromSheet('player-run', 'walk', { frameRate: 8 });
+        
+        // Attack animation
+        try {
+            if (this.textures.exists('player-attack')) {
+                const total = this.textures.get('player-attack').frameTotal || 1;
+                const frames = this.anims.generateFrameNumbers('player-attack', { start: 0, end: total - 1 });
+                
+                this.anims.create({
+                    key: 'attack',
+                    frames: frames,
+                    frameRate: 12,
+                    repeat: 0
+                });
+            }
+        } catch (e) {
+            console.warn('[BootScene] Failed to create attack animation', e);
+        }
 
-        // 오른쪽 방향 (row 2)
-        this.anims.create({
-            key: 'walk-right',
-            frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
-            frameRate: 8,
-            repeat: -1
-        });
-
-        // 왼쪽 방향 (row 3)
-        this.anims.create({
-            key: 'walk-left',
-            frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
-            frameRate: 8,
-            repeat: -1
-        });
-
-        // 정지 프레임
-        this.anims.create({
-            key: 'idle-down',
-            frames: [{ key: 'player', frame: 0 }],
-            frameRate: 1
-        });
-
-        this.anims.create({
-            key: 'idle-up',
-            frames: [{ key: 'player', frame: 4 }],
-            frameRate: 1
-        });
-
-        this.anims.create({
-            key: 'idle-right',
-            frames: [{ key: 'player', frame: 8 }],
-            frameRate: 1
-        });
-
-        this.anims.create({
-            key: 'idle-left',
-            frames: [{ key: 'player', frame: 12 }],
-            frameRate: 1
-        });
+        createAnimationFromSheet('player-dash', 'dash', { frameRate: 8, repeat: 0 });
+        
+        
     }
 }

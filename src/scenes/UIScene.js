@@ -4,7 +4,6 @@
  */
 
 import Phaser from 'phaser';
-import ModeManager from '../state/ModeManager.js';
 
 export default class UIScene extends Phaser.Scene {
     constructor() {
@@ -12,16 +11,10 @@ export default class UIScene extends Phaser.Scene {
     }
 
     create() {
-        // 현재 모드 감지 (in-memory ModeManager 기반)
-        this.modeManager = ModeManager;
-        this.isTrainingMode = this.modeManager.isTraining();
-        // mode 변경 리스너 등록
-        // Use subscribe helper so that newly created UI will immediately be notified of current mode
-        this.modeManager.subscribeModeChange(this.handleModeChanged, this);
-        this.events.on('shutdown', () => this.modeManager.off('modeChanged', this.handleModeChanged, this));
-        console.log('[UIScene] Mode detected:', this.isTrainingMode ? 'Training' : 'Normal');
+        // UI overlay — assumes normal mode only
+        console.log('[UIScene] Starting UI overlay');
         
-        // GameScene 또는 TrainingScene 참조
+        // GameScene 참조
         try {
             this.gameScene = this.scene.get('GameScene');
         } catch (e) {
@@ -29,7 +22,7 @@ export default class UIScene extends Phaser.Scene {
         }
         if (!this.gameScene) {
             try {
-                this.gameScene = this.scene.get('TrainingScene');
+                this.gameScene = this.scene.get('GameScene');
             } catch (e) {
                 // ignore
             }
@@ -682,13 +675,7 @@ export default class UIScene extends Phaser.Scene {
                 <div id="menu-panel">
                     <div id="menu-title">GAME START</div>
                     
-                    <div style="margin: 10px 0 20px 0;">
-                        <div style="color:#fff; font-size:18px; font-weight:bold; margin-bottom:8px;">모드 선택</div>
-                        <div style="display:flex; gap:8px; justify-content:center;">
-                            <button class="menu-button" style="width:auto; padding:12px 24px;" id="mode-game-btn">일반 모드</button>
-                            <button class="menu-button" style="width:auto; padding:12px 24px;" id="mode-training-btn">훈련 모드</button>
-                        </div>
-                    </div>
+                    <!-- Mode selection removed (training mode disabled) -->
 
                     <button class="menu-button primary" id="start-btn">게임 시작</button>
                 </div>
@@ -786,14 +773,9 @@ export default class UIScene extends Phaser.Scene {
         if (!this.gameScene || !this.gameScene.player || !this.gameScene.player.active) return;
         if (!this.gameScene.enemies || !this.gameScene.enemies.children) return;
 
-        // 훈련모드에서는 미니맵 숨김
+        // 미니맵 항상 표시 (훈련 모드 제거)
         const minimapContainer = document.getElementById('minimap-container');
-        if (this.isTrainingMode) {
-            if (minimapContainer) minimapContainer.style.display = 'none';
-            return;
-        } else {
-            if (minimapContainer) minimapContainer.style.display = 'block';
-        }
+        if (minimapContainer) minimapContainer.style.display = 'block';
 
         const ctx = this.minimapCtx;
         const mapSize = 180;
@@ -827,45 +809,7 @@ export default class UIScene extends Phaser.Scene {
         });
     }
 
-    handleModeChanged(mode, prev, options = {}) {
-        this.isTrainingMode = (mode === 'training');
-
-        // 미니맵 보이기/숨기기
-        const minimapContainer = document.getElementById('minimap-container');
-        if (minimapContainer) {
-            minimapContainer.style.display = this.isTrainingMode ? 'none' : 'block';
-        }
-
-        // 버튼 텍스트/상태 업데이트
-        const modeGameBtn = document.getElementById('mode-game-btn');
-        const modeTrainingBtn = document.getElementById('mode-training-btn');
-        if (this.isTrainingMode) {
-            if (modeTrainingBtn) {
-                modeTrainingBtn.style.opacity = '0.5';
-                modeTrainingBtn.style.cursor = 'default';
-                modeTrainingBtn.textContent = '훈련 모드 (현재)';
-            }
-            if (modeGameBtn) {
-                modeGameBtn.style.opacity = null;
-                modeGameBtn.style.cursor = 'pointer';
-                modeGameBtn.textContent = '일반 모드';
-            }
-            // 씬 전환
-            try { this.switchToMode('TrainingScene'); } catch (e) { console.warn('Failed to switch to TrainingScene:', e); }
-        } else {
-            if (modeGameBtn) {
-                modeGameBtn.style.opacity = '0.5';
-                modeGameBtn.style.cursor = 'default';
-                modeGameBtn.textContent = '일반 모드 (현재)';
-            }
-            if (modeTrainingBtn) {
-                modeTrainingBtn.style.opacity = null;
-                modeTrainingBtn.style.cursor = 'pointer';
-                modeTrainingBtn.textContent = '훈련 모드';
-            }
-            try { this.switchToMode('GameScene'); } catch (e) { console.warn('Failed to switch to GameScene:', e); }
-        }
-    }
+    // handleModeChanged removed - training mode logic disabled
 
     initMenuButtons() {
         document.addEventListener('keydown', (e) => {
@@ -883,42 +827,7 @@ export default class UIScene extends Phaser.Scene {
             });
         }
 
-        const modeGameBtn = document.getElementById('mode-game-btn');
-        if (modeGameBtn) {
-            modeGameBtn.addEventListener('click', (e) => {
-                // 일반 모드로 전환 (in-memory, 기존 페이지 리다이렉트 대신)
-                if (this.modeManager.getMode() === 'training') {
-                    const options = { resetPlayerState: !!e.shiftKey };
-                    this.modeManager.setMode('normal', { options });
-                }
-            });
-        }
-        
-        const modeTrainingBtn = document.getElementById('mode-training-btn');
-        if (modeTrainingBtn) {
-            modeTrainingBtn.addEventListener('click', (e) => {
-                // 훈련 모드로 전환 (in-memory)
-                if (this.modeManager.getMode() !== 'training') {
-                    const options = { resetPlayerState: !!e.shiftKey };
-                    this.modeManager.setMode('training', { options });
-                }
-            });
-        }
-
-        // 현재 모드 표시 업데이트
-        if (this.modeManager.isTraining()) {
-            if (modeTrainingBtn) {
-                modeTrainingBtn.style.opacity = '0.5';
-                modeTrainingBtn.style.cursor = 'default';
-                modeTrainingBtn.textContent = '훈련 모드 (현재)';
-            }
-        } else {
-            if (modeGameBtn) {
-                modeGameBtn.style.opacity = '0.5';
-                modeGameBtn.style.cursor = 'default';
-                modeGameBtn.textContent = '일반 모드 (현재)';
-            }
-        }
+        // Mode switching UI removed - training mode is disabled
 
         // 일시정지 메뉴 버튼
         const resumeBtn = document.getElementById('resume-btn');

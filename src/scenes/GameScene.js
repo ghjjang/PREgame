@@ -5,7 +5,7 @@
 
 import Phaser from 'phaser';
 import Player from '../entities/Player.js';
-import ModeManager from '../state/ModeManager.js';
+// ModeManager removed: training mode logic is no longer present
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -25,6 +25,9 @@ export default class GameScene extends Phaser.Scene {
         // 타일맵 이미지
         this.load.image('grass', '/assets/images/Grass 12  .png');
         this.load.image('tree', '/assets/images/summer_pine_tree_tiles.png');
+
+        // 사운드
+        this.load.audio('attackSound', 'assets/sounds/swoshes/attackSound.flac');
     }
 
     create() {
@@ -42,7 +45,8 @@ export default class GameScene extends Phaser.Scene {
         this.player = new Player(this, 0, 0);
 
         // 카메라 설정
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        // Pixel-art: remove camera smoothing to avoid perceived jitter
+        this.cameras.main.startFollow(this.player, true, 1, 1);
         this.cameras.main.setZoom(1);
         this.cameras.main.roundPixels = true; // 픽셀 정렬
 
@@ -65,46 +69,9 @@ export default class GameScene extends Phaser.Scene {
         // 스폰 시스템
         this.spawnTimer = 0;
         this.spawnInterval = 3; // 3초마다 스폰 체크
-        this.isTrainingMode = ModeManager.isTraining();
         this._savedPlayerState = null;
-        // mode change 리스너 (ensure we receive current mode immediately)
-        ModeManager.subscribeModeChange(this.onModeChanged, this);
-        // cleanup on shutdown
-        this.events.on('shutdown', () => {
-            ModeManager.off('modeChanged', this.onModeChanged, this);
-        });
 
-        // If this GameScene was just started as part of a mode switch, a snapshot
-        // may already be stored in ModeManager (either original or preserved).
-        // Apply the snapshot immediately so that the returning player state is restored
-        // even if the modeChanged event fired before this scene was created.
-        try {
-            const originalSnapshot = ModeManager.consumeOriginalPlayerSnapshot();
-            if (originalSnapshot) {
-                console.log('[GameScene] Restoring original player snapshot during create');
-                if (this.player && originalSnapshot.stats) {
-                    Object.assign(this.player.stats, originalSnapshot.stats);
-                    if (originalSnapshot.x !== undefined && originalSnapshot.y !== undefined) {
-                        this.player.x = originalSnapshot.x;
-                        this.player.y = originalSnapshot.y;
-                    }
-                    this.events.emit('playerStatsChanged', this.player.stats);
-                }
-            } else {
-                const preservedSnapshot = ModeManager.consumePlayerSnapshot();
-                if (preservedSnapshot) {
-                    console.log('[GameScene] Restoring preserved player snapshot during create');
-                    if (this.player && preservedSnapshot.stats) {
-                        Object.assign(this.player.stats, preservedSnapshot.stats);
-                        if (preservedSnapshot.x !== undefined && preservedSnapshot.y !== undefined) {
-                            this.player.x = preservedSnapshot.x;
-                            this.player.y = preservedSnapshot.y;
-                        }
-                        this.events.emit('playerStatsChanged', this.player.stats);
-                    }
-                }
-            }
-        } catch (e) { console.warn('[GameScene] Failed to apply initial player snapshot:', e); }
+        // No training snapshot to apply (training mode removed)
 
         // 디버그 키
         this.input.keyboard.on('keydown-F3', () => {
@@ -123,65 +90,43 @@ export default class GameScene extends Phaser.Scene {
     }
 
     createAnimations() {
-        // 애니메이션이 이미 존재하면 건너뛰기
-        if (this.anims.exists('walk-down')) return;
+        // Create generic (direction-agnostic) animations that use the new 48x48 spritesheets.
+        if (this.anims.exists('walk')) return;
 
-        // 아래 방향 (row 0)
-        this.anims.create({
-            key: 'walk-down',
-            frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
-            frameRate: 8,
-            repeat: -1
-        });
+        const createAnimationFromSheet = (key, animKey, config = {}) => {
+            try {
+                if (!this.textures.exists(key)) return;
+                const total = this.textures.get(key).frameTotal || 1;
+                const end = Math.max(0, total - 1);
+                const frames = this.anims.generateFrameNumbers(key, { start: 0, end: end });
+                this.anims.create(Object.assign({ key: animKey, frames, frameRate: 8, repeat: -1 }, config));
+            } catch (e) {
+                console.warn('[GameScene] Failed to create animation from', key, e);
+            }
+        };
 
-        // 위 방향 (row 1)
-        this.anims.create({
-            key: 'walk-up',
-            frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
-            frameRate: 8,
-            repeat: -1
-        });
+        // Idle & Walk/Run
+        createAnimationFromSheet('player-idle', 'idle', { frameRate: 6, repeat: -1 });
+        createAnimationFromSheet('player-run', 'walk', { frameRate: 10, repeat: -1 });
 
-        // 오른쪽 방향 (row 2)
-        this.anims.create({
-            key: 'walk-right',
-            frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
-            frameRate: 8,
-            repeat: -1
-        });
+        // Jump/Fall
+        createAnimationFromSheet('player-jump', 'jump', { frameRate: 12, repeat: 0 });
+        createAnimationFromSheet('player-fall', 'fall', { frameRate: 1, repeat: -1 });
 
-        // 왼쪽 방향 (row 3)
-        this.anims.create({
-            key: 'walk-left',
-            frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
-            frameRate: 8,
-            repeat: -1
-        });
-
-        // 정지 프레임
-        this.anims.create({
-            key: 'idle-down',
-            frames: [{ key: 'player', frame: 0 }],
-            frameRate: 1
-        });
-
-        this.anims.create({
-            key: 'idle-up',
-            frames: [{ key: 'player', frame: 4 }],
-            frameRate: 1
-        });
-
-        this.anims.create({
-            key: 'idle-right',
-            frames: [{ key: 'player', frame: 8 }],
-            frameRate: 1
-        });
-
-        this.anims.create({
-            key: 'idle-left',
-            frames: [{ key: 'player', frame: 12 }],
-            frameRate: 1
-        });
+        // Attack/Dash/Hit/Death
+        // Attack: use all frames
+        try {
+            if (this.textures.exists('player-attack')) {
+                const total = this.textures.get('player-attack').frameTotal || 1;
+                const frames = this.anims.generateFrameNumbers('player-attack', { start: 0, end: total - 1 });
+                this.anims.create({ key: 'attack', frames, frameRate: 12, repeat: 0 });
+            }
+        } catch (e) {
+            console.warn('[GameScene] Failed to create attack animation', e);
+        }
+        createAnimationFromSheet('player-dash', 'dash', { frameRate: 8, repeat: 0 });
+        createAnimationFromSheet('player-hit', 'hit', { frameRate: 6, repeat: 0 });
+        createAnimationFromSheet('player-death', 'death', { frameRate: 4, repeat: 0 });
     }
 
     update(time, delta) {
@@ -202,9 +147,9 @@ export default class GameScene extends Phaser.Scene {
             }
         }
 
-        // 적 스폰 시스템 (훈련모드에서는 스폰하지 않음)
+        // 적 스폰 시스템
         this.spawnTimer += dt;
-        if (!this.isTrainingMode && this.spawnTimer >= this.spawnInterval) {
+        if (this.spawnTimer >= this.spawnInterval) {
             this.spawnTimer = 0;
             this.trySpawnEnemy();
         }
@@ -336,7 +281,6 @@ export default class GameScene extends Phaser.Scene {
     }
 
     updateEnemyAI(enemy) {
-        if (this.isTrainingMode) return; // 훈련모드에서는 AI 동작을 하지 않음
         if (!enemy || !enemy.active || !this.player || !this.player.active) return;
 
         const distance = Phaser.Math.Distance.Between(
@@ -358,79 +302,7 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    onModeChanged(mode, prev, options = {}) {
-        this.isTrainingMode = (mode === 'training');
-        console.log('[GameScene] modeChanged ->', mode);
-        // training mode에서는 스폰 및 AI를 중지
-        if (this.isTrainingMode) {
-            // optional: set existing enemies to passive
-            if (this.enemies && this.enemies.children) {
-                this.enemies.children.entries.forEach(e => { if (e && e.enemyData) { e.enemyData.speed = 0; e.enemyData.attack = 0; } });
-            }
-            // When entering training mode, save or reset player state depending on options
-            try {
-                if (this.player && this.player.stats) {
-                    const snapshot = {
-                        stats: JSON.parse(JSON.stringify(this.player.stats)),
-                        x: this.player.x,
-                        y: this.player.y,
-                        preserve: !(options && options.resetPlayerState)
-                    };
-                    if (options && options.resetPlayerState) {
-                        // Save original so we can restore after training
-                        ModeManager.setOriginalPlayerSnapshot(snapshot);
-                        // Do not preserve carried snapshot in this mode
-                        ModeManager.setPlayerSnapshot(null);
-                        // Reset current player for training defaults
-                        this.player.x = 0;
-                        this.player.y = 0;
-                        this.player.stats.hp = this.player.stats.maxHp;
-                        this.player.stats.sp = this.player.stats.maxSp;
-                        this.player.stats.xp = 0;
-                        this.events.emit('playerStatsChanged', this.player.stats);
-                    } else {
-                        // Preserve player state across scenes by setting player snapshot
-                        ModeManager.setPlayerSnapshot(snapshot);
-                    }
-                }
-            } catch (e) { console.warn('[GameScene] Failed to snapshot/modify player on mode change:', e); }
-        } else {
-            // restore default spawn interval
-            this.spawnInterval = 3;
-            // If there is an original player snapshot available in ModeManager (for reset), restore
-            const originalSnapshot = ModeManager.consumeOriginalPlayerSnapshot();
-            if (originalSnapshot) {
-                try {
-                    console.log('[GameScene] Restoring player state from original snapshot');
-                    if (this.player && originalSnapshot.stats) {
-                        Object.assign(this.player.stats, originalSnapshot.stats);
-                        if (originalSnapshot.x !== undefined && originalSnapshot.y !== undefined) {
-                            this.player.x = originalSnapshot.x;
-                            this.player.y = originalSnapshot.y;
-                        }
-                        this.events.emit('playerStatsChanged', this.player.stats);
-                    }
-                } catch (e) { console.warn('Failed to restore player state:', e); }
-            }
-            else {
-                // If no original snapshot, check for preserved snapshot from training
-                const preservedSnapshot = ModeManager.consumePlayerSnapshot();
-                if (preservedSnapshot) {
-                    try {
-                        console.log('[GameScene] Restoring player state from preserved snapshot');
-                        if (this.player && preservedSnapshot.stats) {
-                            Object.assign(this.player.stats, preservedSnapshot.stats);
-                            if (preservedSnapshot.x !== undefined && preservedSnapshot.y !== undefined) {
-                                this.player.x = preservedSnapshot.x;
-                                this.player.y = preservedSnapshot.y;
-                            }
-                            this.events.emit('playerStatsChanged', this.player.stats);
-                        }
-                    } catch (e) { console.warn('Failed to restore player state from preserved snapshot:', e); }
-                }
-            }
-        }
-    }
+    // onModeChanged removed (training mode is disabled)
 
     useEnemySkill(enemy) {
         // 적 스킬: 플레이어 방향으로 투사체 발사
@@ -442,7 +314,8 @@ export default class GameScene extends Phaser.Scene {
         const projectile = this.add.circle(enemy.x, enemy.y, 8, 0xff6600, 1);
         this.physics.add.existing(projectile);
         
-        const speed = 200;
+        const speed = 200; // 투사체 속도 정의
+
         projectile.body.setVelocity(
             Math.cos(angle) * speed,
             Math.sin(angle) * speed
